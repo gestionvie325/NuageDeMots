@@ -40,6 +40,8 @@ public class WordClickManager : MonoBehaviour
             Debug.Log("Mot cliqué : " + word.name);
             Debug.Log("Définition : " + word.definition);
 
+
+
             if (BottomPanelUI.instance != null)
                 BottomPanelUI.instance.ShowDefinition(word.definition);
             else

@@ -44,6 +44,9 @@ public class AutoFlightController : MonoBehaviour
 
         if (randomWord != null)
         {
+
+
+
             BottomPanelUI.instance.ShowDefinition(randomWord.definition);
             CameraFocusController.instance.FocusOnWord(randomWord.transform);
         }

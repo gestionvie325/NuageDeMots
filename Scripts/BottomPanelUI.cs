@@ -39,7 +39,7 @@ public class BottomPanelUI : MonoBehaviour
 
     public TMP_Text definitionText;
 
-    public float hiddenY = -350f;
+    public float hiddenY = -300f;
 
     public float shownY = 0f;
 

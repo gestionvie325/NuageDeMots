@@ -13,6 +13,8 @@ public class WordData
 
 public class WordCloudManager : MonoBehaviour
 {
+    public static WordCloudManager instance;
+
     public GameObject wordPrefab;
     public int numberOfWords = 100;
 
@@ -22,39 +24,35 @@ public class WordCloudManager : MonoBehaviour
 
     public List<WordData> words = new List<WordData>();
 
-
-
-    //******
     public float recycleDistanceBehindCamera = 20f;
     public float recycleDistanceAhead = 500f;
 
     private int nextWordIndex = 0;
     private Camera cam;
-    //*******//
 
+    private List<GameObject> spawnedWordObjects =
+        new List<GameObject>();
 
-
-
-    void ShuffleWords()
-{
-    for (int i = 0; i < words.Count; i++)
+    string SavePath
     {
-        int randomIndex = Random.Range(i, words.Count);
-
-        WordData temp = words[i];
-        words[i] = words[randomIndex];
-        words[randomIndex] = temp;
+        get
+        {
+            return Path.Combine(
+                Application.persistentDataPath,
+                "dictionary.xml"
+            );
+        }
     }
-}
 
-
-
-
+    void Awake()
+    {
+        instance = this;
+    }
 
     void Start()
     {
-
         cam = Camera.main;
+
         LoadXML();
 
         ShuffleWords();
@@ -75,123 +73,117 @@ public class WordCloudManager : MonoBehaviour
     }
 
     void Update()
-{
-    RecycleWords();
-}
-
-    void RecycleWords()
-{
-    if (cam == null) return;
-
-    foreach (WordBehaviour word in WordBehaviour.allWords)
     {
-        if (word.transform.position.z < cam.transform.position.z - recycleDistanceBehindCamera)
+        RecycleWords();
+    }
+
+    void ShuffleWords()
+    {
+        for (int i = 0; i < words.Count; i++)
         {
-            RepositionWord(word);
+            int randomIndex = Random.Range(i, words.Count);
+
+            WordData temp = words[i];
+            words[i] = words[randomIndex];
+            words[randomIndex] = temp;
         }
     }
-}
 
-
-void RepositionWord(WordBehaviour word)
-{
-    float x = Random.Range(-spreadX, spreadX);
-    float y = Random.Range(-spreadY, spreadY);
-    float z = cam.transform.position.z + recycleDistanceAhead + Random.Range(0f, 200f);
-
-    word.transform.position = new Vector3(x, y, z);
-
-    WordData wd = GetNextRandomWord();
-
-    word.SetWord(wd.mot, wd.definition);
-}
-
-WordData GetNextRandomWord()
-{
-    if (nextWordIndex >= words.Count)
+    void RecycleWords()
     {
-        ShuffleWords();
-        nextWordIndex = 0;
+        if (cam == null) return;
+
+        foreach (WordBehaviour word in WordBehaviour.allWords)
+        {
+            if (word == null) continue;
+
+            if (word.transform.position.z <
+                cam.transform.position.z - recycleDistanceBehindCamera)
+            {
+                RepositionWord(word);
+            }
+        }
     }
 
-    WordData wd = words[nextWordIndex];
-    nextWordIndex++;
+    void RepositionWord(WordBehaviour word)
+    {
+        float x = Random.Range(-spreadX, spreadX);
+        float y = Random.Range(-spreadY, spreadY);
 
-    return wd;
-}
+        float z =
+            cam.transform.position.z
+            + recycleDistanceAhead
+            + Random.Range(0f, 200f);
 
+        word.transform.position = new Vector3(x, y, z);
 
+        WordData wd = GetNextRandomWord();
 
+        word.SetWord(wd.mot, wd.definition);
+
+        TextMeshCollider colliderUpdater =
+            word.GetComponentInChildren<TextMeshCollider>();
+
+        if (colliderUpdater != null)
+        {
+            colliderUpdater.UpdateCollider();
+        }
+    }
+
+    WordData GetNextRandomWord()
+    {
+        if (nextWordIndex >= words.Count)
+        {
+            ShuffleWords();
+            nextWordIndex = 0;
+        }
+
+        WordData wd = words[nextWordIndex];
+        nextWordIndex++;
+
+        return wd;
+    }
 
     void LoadXML()
     {
-        /*string path = Path.Combine(Application.streamingAssetsPath, "dictionary.xml");
-         *
-         Ancien ok*/
-        //Nouvelle solution pour windows et android :
-        TextAsset xmlFile = Resources.Load<TextAsset>("dictionary");
+        words.Clear();
+
         XmlDocument doc = new XmlDocument();
 
-
-        if (xmlFile != null)
+        if (File.Exists(SavePath))
         {
-            string xmlText = xmlFile.text;
-
+            string xmlText = File.ReadAllText(SavePath);
             doc.LoadXml(xmlText);
 
-            XmlNodeList words = doc.GetElementsByTagName("word");
+            Debug.Log("Dictionnaire chargé depuis : " + SavePath);
+        }
+        else
+        {
+            TextAsset xmlFile =
+                Resources.Load<TextAsset>("dictionary");
 
-            foreach (XmlNode word in words)
+            if (xmlFile == null)
             {
-                Debug.Log(word.InnerText);
+                Debug.LogError("dictionary.xml introuvable dans Resources.");
+                return;
             }
+
+            doc.LoadXml(xmlFile.text);
+
+            Debug.Log("Dictionnaire chargé depuis Resources.");
         }
-        else
-        {
-            Debug.LogError("dictionary.xml introuvable");
-        }
 
-
-
-
-
-/*
-        Debug.Log(path);
-
-        if (File.Exists(path))
-        {
-            string xmlContent = File.ReadAllText(path);
-            Debug.Log(xmlContent);
-        }
-        else
-        {
-            Debug.LogError("Fichier XML introuvable !");
-        }
-   */
-
-
-
-
-
-    /*    string path = Path.Combine(Application.dataPath, "StreamingAssets/dictionary.xml");
-*/
-    /*    XmlDocument xmlDoc = new XmlDocument();
-        xmlDoc.Load(path);
-ancien ok */
-/*
-    UnityWebRequest request = UnityWebRequest.Get(
-    System.IO.Path.Combine(Application.streamingAssetsPath, "dictionary.xml")
-);
-
-    doc.LoadXml(request.downloadHandler.text);
-   */
-
-
-
-        XmlNodeList wordNodes = doc.SelectNodes("//element");
+        XmlNodeList wordNodes =
+            doc.SelectNodes("//element");
 
         foreach (XmlNode node in wordNodes)
         {
+            if (node["mot"] == null)
+                continue;
+
+            if (node["definition"] == null)
+                continue;
+
             WordData wd = new WordData();
 
             wd.mot = node["mot"].InnerText;
@@ -205,6 +197,10 @@ ancien ok */
 
     void GenerateWords()
     {
+        ClearGeneratedWords();
+
+        nextWordIndex = 0;
+
         for (int i = 0; i < numberOfWords; i++)
         {
             float x = Random.Range(-spreadX, spreadX);
@@ -219,7 +215,10 @@ ancien ok */
                 Quaternion.identity
             );
 
-            TMP_Text txt = wordObj.GetComponentInChildren<TMP_Text>();
+            spawnedWordObjects.Add(wordObj);
+
+            TMP_Text txt =
+                wordObj.GetComponentInChildren<TMP_Text>();
 
             if (txt == null)
             {
@@ -229,23 +228,162 @@ ancien ok */
 
             WordData wd = GetNextRandomWord();
 
-WordBehaviour wb = wordObj.GetComponent<WordBehaviour>();
-
-if (wb != null)
-{
-    wb.SetWord(wd.mot, wd.definition);
-}
-
-            //WordBehaviour wb = wordObj.GetComponent<WordBehaviour>();
+            WordBehaviour wb =
+                wordObj.GetComponent<WordBehaviour>();
 
             if (wb != null)
             {
-                wb.definition = wd.definition;
+                wb.SetWord(wd.mot, wd.definition);
             }
             else
             {
                 Debug.LogError("Aucun WordBehaviour trouvé sur le prefab.");
             }
+
+            TextMeshCollider colliderUpdater =
+                wordObj.GetComponentInChildren<TextMeshCollider>();
+
+            if (colliderUpdater != null)
+            {
+                colliderUpdater.UpdateCollider();
+            }
         }
+    }
+
+    void ClearGeneratedWords()
+    {
+        foreach (GameObject obj in spawnedWordObjects)
+        {
+            if (obj != null)
+            {
+                Destroy(obj);
+            }
+        }
+
+        spawnedWordObjects.Clear();
+
+        WordBehaviour.allWords.Clear();
+    }
+
+    public string GetDictionaryAsEditorText()
+    {
+        string result = "";
+
+        foreach (WordData wd in words)
+        {
+            result += "[" + wd.mot + " = " + wd.definition + "];\n";
+        }
+
+        return result;
+    }
+
+    public string GetSavedDictionaryAsEditorText()
+{
+    string savePath = Path.Combine(
+        Application.persistentDataPath,
+        "dictionary.xml"
+    );
+
+    if (!File.Exists(savePath))
+    {
+        Debug.LogWarning(
+            "Aucun dictionnaire personnalisé sauvegardé. Chargement du dictionnaire actuel."
+        );
+
+        return GetDictionaryAsEditorText();
+    }
+
+    XmlDocument doc = new XmlDocument();
+
+    try
+    {
+        string xmlText =
+            File.ReadAllText(savePath);
+
+        doc.LoadXml(xmlText);
+    }
+    catch
+    {
+        Debug.LogError("Impossible de lire le dictionnaire personnalisé.");
+
+        return GetDictionaryAsEditorText();
+    }
+
+    string result = "";
+
+    XmlNodeList wordNodes =
+        doc.SelectNodes("//element");
+
+    foreach (XmlNode node in wordNodes)
+    {
+        if (node["mot"] == null)
+            continue;
+
+        if (node["definition"] == null)
+            continue;
+
+        string mot =
+            node["mot"].InnerText.Trim();
+
+        string definition =
+            node["definition"].InnerText.Trim();
+
+        result += "[" + mot + " = " + definition + "];\n";
+    }
+
+    return result;
+}
+
+
+
+    public void ReplaceDictionary(List<WordData> newWords)
+    {
+        words.Clear();
+
+        foreach (WordData wd in newWords)
+        {
+            words.Add(wd);
+        }
+
+        SaveDictionaryToXML();
+
+        ShuffleWords();
+
+        GenerateWords();
+    }
+
+    void SaveDictionaryToXML()
+    {
+        XmlDocument doc = new XmlDocument();
+
+        XmlElement root =
+            doc.CreateElement("dictionary");
+
+        doc.AppendChild(root);
+
+        foreach (WordData wd in words)
+        {
+            XmlElement element =
+                doc.CreateElement("element");
+
+            XmlElement mot =
+                doc.CreateElement("mot");
+
+            mot.InnerText = wd.mot;
+
+            XmlElement definition =
+                doc.CreateElement("definition");
+
+            definition.InnerText = wd.definition;
+
+            element.AppendChild(mot);
+            element.AppendChild(definition);
+
+            root.AppendChild(element);
+        }
+
+        doc.Save(SavePath);
+
+        Debug.Log("Dictionnaire sauvegardé dans : " + SavePath);
     }
 }
